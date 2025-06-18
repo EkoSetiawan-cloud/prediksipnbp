@@ -75,7 +75,7 @@ if uploaded_file:
             df_filtered = df_filtered.set_index('Tahun').asfreq('YS')
 
             try:
-                model = ExponentialSmoothing(df_filtered['PNBP'], trend='add', seasonal=None, initialization_method="estimated")
+                model = ExponentialSmoothing(df_filtered['PNBP'], trend='add', seasonal='add', seasonal_periods=1, initialization_method="estimated")
                 model_fit = model.fit()
 
                 fitted = model_fit.fittedvalues

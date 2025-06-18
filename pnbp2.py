@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -53,7 +54,6 @@ if uploaded_file:
     df_long['Tahun'] = pd.to_datetime(df_long['Tahun'], format='%Y')
     df_long['PNBP'] = df_long['PNBP'].astype(str).str.replace(".", "", regex=False).astype(float)
 
-    # Tambahkan filter slider berdasarkan tahun
     min_year = df_long['Tahun'].dt.year.min()
     max_year = df_long['Tahun'].dt.year.max()
     tahun_range = st.slider(
@@ -77,78 +77,47 @@ if uploaded_file:
             try:
                 model = ExponentialSmoothing(df_filtered['PNBP'], trend='add', seasonal=None, initialization_method="estimated")
                 model_fit = model.fit()
+
+                fitted = model_fit.fittedvalues
+                fitted.index = df_filtered.index
+
                 forecast = model_fit.forecast(steps=3)
                 forecast.index = pd.date_range(start=df_filtered.index.max() + pd.DateOffset(years=1), periods=3, freq='YS')
 
-                df_pred = pd.concat([df_filtered['PNBP'], forecast])
+                df_pred_all = pd.concat([fitted, forecast])
+                df_actual = df_filtered['PNBP']
 
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    hovertemplate='Des %{x|%Y}<br>Prediksi: %{y:.2s}',
-                    x=df_filtered.index, y=df_filtered['PNBP'],
-                    mode='lines+markers', name='Aktual',
-                    line=dict(color='blue', width=2), marker=dict(color='blue')
-                ))
-                fig.add_trace(go.Scatter(
-                    hovertemplate='Des %{x|%Y}<br>Prediksi: %{y:.2s}',
-                    x=forecast.index, y=forecast.values,
-                    mode='lines+markers', name='Prediksi',
-                    line=dict(color='orange', width=2, dash='dot'), marker=dict(color='orange')
-                ))
-
+                fig.add_trace(go.Scatter(x=df_actual.index, y=df_actual, mode='lines+markers', name='Aktual',
+                                         line=dict(color='blue'), marker=dict(color='blue')))
+                fig.add_trace(go.Scatter(x=df_pred_all.index, y=df_pred_all, mode='lines+markers', name='Prediksi',
+                                         line=dict(color='orange', dash='dot'), marker=dict(color='orange')))
                 fig.update_layout(
-                    margin=dict(t=40),
-                    title=f'Prediksi BHP PNBP - {jenis}',
+                    title=f'Prediksi BHP PNBP 2014–2027 - {jenis}',
                     xaxis_title='Tahun',
-                    yaxis_title='BHP_PNBP',
+                    yaxis_title='PNBP',
                     plot_bgcolor='white',
                     paper_bgcolor='white',
-                    font=dict(color='black', size=12),
-                    xaxis=dict(
-                        tickmode='array',
-                        tickvals=df_pred.index,
-                        tickformat='%Y',
-                        title_font=dict(color='black'),
-                        tickfont=dict(color='black'),
-                        showgrid=True,
-                        gridcolor='lightgray',
-                        gridwidth=0.5
-                    ),
-                    yaxis=dict(
-                        title_font=dict(color='black'),
-                        tickfont=dict(color='black'),
-                        showgrid=True,
-                        gridcolor='lightgray',
-                        gridwidth=0.5
-                    ),
-                    legend=dict(font=dict(color='black')),
-                    hoverlabel=dict(bgcolor='white', font=dict(color='black')),
                     hovermode='x unified'
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
                 st.markdown("### 📅 Prediksi 3 Tahun ke Depan")
-
                 forecast_df = pd.DataFrame({
                     'Tahun': forecast.index.year,
                     'Prediksi PNBP': forecast.values
                 })
                 forecast_df['Prediksi PNBP'] = forecast_df['Prediksi PNBP'].apply(lambda x: f"Rp {x:,.0f}")
-
                 for index, row in forecast_df.iterrows():
                     st.markdown(f"**{row['Tahun']}** : {row['Prediksi PNBP']}")
 
-                mape = mean_absolute_percentage_error(df_filtered['PNBP'], model_fit.fittedvalues)
-                mae = mean_absolute_error(df_filtered['PNBP'], model_fit.fittedvalues)
-                rmse = np.sqrt(mean_squared_error(df_filtered['PNBP'], model_fit.fittedvalues))
-                st.write(
-                    "Performa model dievaluasi menggunakan tiga metrik utama untuk menilai akurasi terhadap data historis, "
-                    "yaitu **MAPE** (Mean Absolute Percentage Error), **MAE** (Mean Absolute Error), dan **RMSE** (Root Mean Squared Error). "
-                    "Hasil evaluasi sebagai berikut:"
-                )
-                st.write(f"📊 MAPE: {mape:.2%}")
-                st.write(f"📊 MAE: Rp {mae:,.0f}")
-                st.write(f"📊 RMSE: Rp {rmse:,.0f}")
+                mape = mean_absolute_percentage_error(df_actual, model_fit.fittedvalues)
+                mae = mean_absolute_error(df_actual, model_fit.fittedvalues)
+                rmse = np.sqrt(mean_squared_error(df_actual, model_fit.fittedvalues))
+                st.write("📊 **Evaluasi Performa (2014–2024)**")
+                st.write(f"MAPE: {mape:.2%}")
+                st.write(f"MAE: Rp {mae:,.0f}")
+                st.write(f"RMSE: Rp {rmse:,.0f}")
 
             except Exception as e:
                 st.warning(f"Gagal memproses prediksi untuk '{jenis}'. Periksa data atau parameter model.")
